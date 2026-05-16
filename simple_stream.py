@@ -5,7 +5,6 @@ import time
 
 app = Flask(__name__)
 
-# ── Frame buffer ───────────────────────────────────────────────
 latest_frame = None
 lock = threading.Lock()
 
@@ -14,8 +13,7 @@ def capture_loop():
     cmd = [
         'ffmpeg',
         '-f', 'v4l2',
-        '-input_format', 'mjpeg',
-        '-video_size', '640x480',
+        '-video_size', '640x480',  # removed -input_format mjpeg
         '-framerate', '30',
         '-i', '/dev/video0',
         '-f', 'image2pipe',
@@ -23,28 +21,38 @@ def capture_loop():
         '-q:v', '5',
         'pipe:1'
     ]
+    print("[INFO] Starting ffmpeg...")
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                                 stderr=subprocess.DEVNULL)
+                                 stderr=subprocess.PIPE)  # capture stderr too
+
     jpg_start = b'\xff\xd8'
     jpg_end   = b'\xff\xd9'
     buf = b''
+    frame_count = 0
 
     while True:
         chunk = proc.stdout.read(4096)
         if not chunk:
+            # print ffmpeg error if pipe dies
+            err = proc.stderr.read().decode()
+            print("[FFMPEG ERROR]", err)
             break
+
         buf += chunk
         start = buf.find(jpg_start)
         end   = buf.find(jpg_end)
+
         if start != -1 and end != -1 and end > start:
             jpg = buf[start:end+2]
             buf = buf[end+2:]
             with lock:
                 latest_frame = jpg
+            frame_count += 1
+            if frame_count % 30 == 0:
+                print(f"[INFO] Frames captured: {frame_count}, size: {len(jpg)} bytes")
 
 threading.Thread(target=capture_loop, daemon=True).start()
 
-# ── MJPEG generator ────────────────────────────────────────────
 def generate():
     while True:
         with lock:
@@ -60,7 +68,6 @@ def generate():
                + b'\r\n')
         time.sleep(0.033)
 
-# ── Routes ─────────────────────────────────────────────────────
 @app.route('/')
 def home():
     return """
