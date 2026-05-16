@@ -6,30 +6,26 @@ app = Flask(__name__)
 
 cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
 
-def gen():
+def generate():
     while True:
         ret, frame = cap.read()
         if not ret:
             continue
 
-        ok, jpg = cv2.imencode(".jpg", frame)
-        if not ok:
-            continue
+        frame = cv2.resize(frame, (640, 480))
+
+        _, buffer = cv2.imencode('.jpg', frame)
 
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' +
-               jpg.tobytes() +
+               buffer.tobytes() +
                b'\r\n')
 
         time.sleep(0.03)
 
-@app.route('/')
-def home():
-    return '<img src="/video">'
-
-@app.route('/video')
-def video():
-    return Response(gen(),
+@app.route('/video_feed')
+def video_feed():
+    return Response(generate(),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
 
-app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)
+app.run(host='0.0.0.0', port=5000, threaded=True)
