@@ -16,6 +16,7 @@ def capture_loop():
         '-video_size', '640x480',  # removed -input_format mjpeg
         '-framerate', '30',
         '-i', '/dev/video0',
+        'vf', 'format=yuv420p',
         '-f', 'image2pipe',
         '-vcodec', 'mjpeg',
         '-q:v', '5',
