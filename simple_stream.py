@@ -1,31 +1,25 @@
 from flask import Flask, Response
 import cv2
-import time
 
 app = Flask(__name__)
-
-cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
+cap = cv2.VideoCapture(0)  # No backend, no FOURCC
 
 def generate():
     while True:
         ret, frame = cap.read()
         if not ret:
             continue
+        _, buf = cv2.imencode('.jpg', frame)
+        yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n'
+               + buf.tobytes() + b'\r\n')
 
-        frame = cv2.resize(frame, (640, 480))
-
-        _, buffer = cv2.imencode('.jpg', frame)
-
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' +
-               buffer.tobytes() +
-               b'\r\n')
-
-        time.sleep(0.03)
-
-@app.route('/video_feed')
-def video_feed():
+@app.route('/video')
+def video():
     return Response(generate(),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
 
-app.run(host='0.0.0.0', port=5000, threaded=True)
+@app.route('/')
+def home():
+    return '<img src="/video" width="640"/>'
+
+app.run(host='0.0.0.0', port=5000)
