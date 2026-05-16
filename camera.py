@@ -1,21 +1,14 @@
 from flask import Flask, Response
-from picamera2 import Picamera2
 import cv2
 
 app = Flask(__name__)
-
-picam2 = Picamera2()
-
-config = picam2.create_preview_configuration(
-    main={"size": (320, 240), "format": "RGB888"}
-)
-
-picam2.configure(config)
-picam2.start()
+cap = cv2.VideoCapture(0)
 
 def generate():
     while True:
-        frame = picam2.capture_array()
+        ret, frame = cap.read()
+        if not ret:
+            break
 
         _, buffer = cv2.imencode('.jpg', frame)
 
