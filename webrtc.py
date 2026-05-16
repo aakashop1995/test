@@ -1,18 +1,15 @@
 import cv2
+import numpy as np
 import asyncio
 from aiohttp import web
 
-from aiortc import (
-    RTCPeerConnection,
-    RTCSessionDescription,
-    VideoStreamTrack
-)
+from aiortc import RTCPeerConnection, RTCSessionDescription, VideoStreamTrack
 from av import VideoFrame
 
 pcs = set()
 
 # -----------------------------
-# Camera Stream Track
+# Camera Track (SAFE VERSION)
 # -----------------------------
 class CameraTrack(VideoStreamTrack):
     def __init__(self):
@@ -26,10 +23,12 @@ class CameraTrack(VideoStreamTrack):
         pts, time_base = await self.next_timestamp()
 
         ret, frame = self.cap.read()
-        if not ret:
-            frame = np.zeros((240, 320, 3), dtype=np.uint8)
 
-        frame = cv2.resize(frame, (320, 240))
+        # IMPORTANT: SAFE FALLBACK
+        if not ret or frame is None:
+            frame = np.zeros((240, 320, 3), dtype=np.uint8)
+        else:
+            frame = cv2.resize(frame, (320, 240))
 
         video_frame = VideoFrame.from_ndarray(frame, format="bgr24")
         video_frame.pts = pts
@@ -39,7 +38,7 @@ class CameraTrack(VideoStreamTrack):
 
 
 # -----------------------------
-# Offer Handler (FIXED)
+# Offer handler (SAFE)
 # -----------------------------
 async def offer(request):
     params = await request.json()
@@ -68,14 +67,14 @@ async def offer(request):
 
 
 # -----------------------------
-# Simple HTML Page
+# HTML
 # -----------------------------
 async def index(request):
     return web.Response(text="""
 <!DOCTYPE html>
 <html>
 <body>
-<h2>Raspberry Pi WebRTC Camera</h2>
+<h2>Pi WebRTC Camera</h2>
 
 <video id="video" autoplay playsinline></video>
 
@@ -109,14 +108,10 @@ start();
 
 
 # -----------------------------
-# Server Setup
+# App
 # -----------------------------
 app = web.Application()
 app.router.add_get("/", index)
 app.router.add_post("/offer", offer)
 
-
-# -----------------------------
-# Run Server
-# -----------------------------
 web.run_app(app, host="0.0.0.0", port=8080)
