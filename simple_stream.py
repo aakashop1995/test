@@ -1,23 +1,9 @@
-import sys
-sys.path.insert(0, '/usr/lib/python3/dist-packages')
-
 from flask import Flask, Response
-from picamera2 import Picamera2
-import cv2
+import subprocess
 import threading
 import time
 
 app = Flask(__name__)
-
-# ── Camera setup ───────────────────────────────────────────────
-picam2 = Picamera2()
-config = picam2.create_video_configuration(
-    main={"size": (640, 480), "format": "RGB888"},
-    controls={"FrameRate": 30}
-)
-picam2.configure(config)
-picam2.start()
-time.sleep(1)  # warmup
 
 # ── Frame buffer ───────────────────────────────────────────────
 latest_frame = None
@@ -25,15 +11,36 @@ lock = threading.Lock()
 
 def capture_loop():
     global latest_frame
+    cmd = [
+        'ffmpeg',
+        '-f', 'v4l2',
+        '-input_format', 'mjpeg',
+        '-video_size', '640x480',
+        '-framerate', '30',
+        '-i', '/dev/video0',
+        '-f', 'image2pipe',
+        '-vcodec', 'mjpeg',
+        '-q:v', '5',
+        'pipe:1'
+    ]
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                                 stderr=subprocess.DEVNULL)
+    jpg_start = b'\xff\xd8'
+    jpg_end   = b'\xff\xd9'
+    buf = b''
+
     while True:
-        frame = picam2.capture_array()
-        frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-        success, buffer = cv2.imencode('.jpg', frame_bgr,
-                                       [cv2.IMWRITE_JPEG_QUALITY, 80])
-        if success:
+        chunk = proc.stdout.read(4096)
+        if not chunk:
+            break
+        buf += chunk
+        start = buf.find(jpg_start)
+        end   = buf.find(jpg_end)
+        if start != -1 and end != -1 and end > start:
+            jpg = buf[start:end+2]
+            buf = buf[end+2:]
             with lock:
-                latest_frame = buffer.tobytes()
-        time.sleep(0.033)
+                latest_frame = jpg
 
 threading.Thread(target=capture_loop, daemon=True).start()
 
