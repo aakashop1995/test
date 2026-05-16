@@ -1,16 +1,18 @@
 import cv2
 
-# Try all common video devices
-for i in [0, 1, 2, 3, 12, 13, 14]:
-    cap = cv2.VideoCapture(i)
-    if cap.isOpened():
-        ret, frame = cap.read()
-        if ret and frame is not None:
-            print(f"[OK] Device /dev/video{i} works — shape: {frame.shape}")
-            cv2.imwrite(f'/tmp/test_video{i}.jpg', frame)
-            print(f"[SAVED] /tmp/test_video{i}.jpg")
-        else:
-            print(f"[FAIL] Device /dev/video{i} opened but no frame")
-        cap.release()
-    else:
-        print(f"[SKIP] /dev/video{i} could not open")
+cap = cv2.VideoCapture(0)
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+
+# Skip warmup frames
+for i in range(30):
+    cap.read()
+
+ret, frame = cap.read()
+print("ret:", ret)
+print("shape:", frame.shape if frame is not None else "None")
+print("mean color (BGR):", frame.mean(axis=(0,1)) if frame is not None else "None")
+
+cv2.imwrite('/tmp/test_opencv.jpg', frame)
+print("Saved to /tmp/test_opencv.jpg")
+cap.release()
