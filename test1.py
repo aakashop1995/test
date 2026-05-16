@@ -1,10 +1,10 @@
 import cv2
 
-cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
+cap = cv2.VideoCapture(0)
+print("Opened:", cap.isOpened())
 
 ret, frame = cap.read()
-print("read:", ret)
+print("Frame read:", ret)
+print("Frame shape:", frame.shape if frame is not None else "None")
 
-if ret:
-    ok, jpg = cv2.imencode(".jpg", frame)
-    print("encode:", ok, len(jpg))
+cap.release()
