@@ -1,18 +1,24 @@
 import cv2
 import asyncio
 from aiohttp import web
-from aiortc import RTCPeerConnection, VideoStreamTrack
+
+from aiortc import (
+    RTCPeerConnection,
+    RTCSessionDescription,
+    VideoStreamTrack
+)
 from av import VideoFrame
 
 pcs = set()
 
 # -----------------------------
-# Camera Track
+# Camera Stream Track
 # -----------------------------
-class CameraStream(VideoStreamTrack):
+class CameraTrack(VideoStreamTrack):
     def __init__(self):
         super().__init__()
         self.cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
+
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
 
@@ -21,7 +27,7 @@ class CameraStream(VideoStreamTrack):
 
         ret, frame = self.cap.read()
         if not ret:
-            return None
+            frame = np.zeros((240, 320, 3), dtype=np.uint8)
 
         frame = cv2.resize(frame, (320, 240))
 
@@ -33,32 +39,44 @@ class CameraStream(VideoStreamTrack):
 
 
 # -----------------------------
-# WebRTC Offer handler
+# Offer Handler (FIXED)
 # -----------------------------
 async def offer(request):
     params = await request.json()
 
+    offer = RTCSessionDescription(
+        sdp=params["offer"]["sdp"],
+        type=params["offer"]["type"]
+    )
+
     pc = RTCPeerConnection()
     pcs.add(pc)
 
-    pc.addTrack(CameraStream())
+    pc.addTrack(CameraTrack())
 
-    await pc.setRemoteDescription(params["offer"])
+    await pc.setRemoteDescription(offer)
+
     answer = await pc.createAnswer()
     await pc.setLocalDescription(answer)
 
-    return web.json_response({"answer": pc.localDescription})
+    return web.json_response({
+        "answer": {
+            "sdp": pc.localDescription.sdp,
+            "type": pc.localDescription.type
+        }
+    })
 
 
 # -----------------------------
-# Simple HTML page
+# Simple HTML Page
 # -----------------------------
 async def index(request):
     return web.Response(text="""
 <!DOCTYPE html>
 <html>
 <body>
-<h2>Pi Camera WebRTC</h2>
+<h2>Raspberry Pi WebRTC Camera</h2>
+
 <video id="video" autoplay playsinline></video>
 
 <script>
@@ -69,34 +87,36 @@ pc.ontrack = (event) => {
 };
 
 async function start() {
-    let offer = await pc.createOffer();
+    const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
 
-    let response = await fetch("/offer", {
+    const response = await fetch("/offer", {
         method: "POST",
-        body: JSON.stringify({offer: pc.localDescription}),
-        headers: {"Content-Type": "application/json"}
+        body: JSON.stringify({ offer: pc.localDescription }),
+        headers: { "Content-Type": "application/json" }
     });
 
-    let data = await response.json();
+    const data = await response.json();
     await pc.setRemoteDescription(data.answer);
 }
 
 start();
 </script>
+
 </body>
 </html>
 """, content_type="text/html")
 
 
 # -----------------------------
-# App setup
+# Server Setup
 # -----------------------------
 app = web.Application()
 app.router.add_get("/", index)
 app.router.add_post("/offer", offer)
 
+
 # -----------------------------
-# Run server
+# Run Server
 # -----------------------------
 web.run_app(app, host="0.0.0.0", port=8080)
