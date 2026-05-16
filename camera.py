@@ -10,7 +10,6 @@ cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 def generate():
     while True:
         ret, frame = cap.read()
-
         if not ret or frame is None:
             continue
 
@@ -20,16 +19,31 @@ def generate():
         if not success:
             continue
 
+        frame_bytes = buffer.tobytes()
+
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' +
-               buffer.tobytes() +
+               frame_bytes +
                b'\r\n')
 
-        time.sleep(0.03)  # IMPORTANT for stability
+        time.sleep(0.03)
+
+@app.route('/')
+def home():
+    return """
+    <html>
+    <body>
+    <h2>Camera Stream</h2>
+    <img src="/video" />
+    </body>
+    </html>
+    """
 
 @app.route('/video')
 def video():
-    return Response(generate(),
-                    mimetype='multipart/x-mixed-replace; boundary=frame')
+    return Response(
+        generate(),
+        mimetype='multipart/x-mixed-replace; boundary=frame'
+    )
 
 app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)
