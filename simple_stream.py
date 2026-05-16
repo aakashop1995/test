@@ -68,6 +68,12 @@ def generate():
                + b'\r\n')
         time.sleep(0.033)
 
+from flask import send_file
+
+@app.route('/testimg')
+def testimg():
+    return send_file('/home/ubuntu/pothole_detection/test/test.jpg')
+
 @app.route('/')
 def home():
     return """
