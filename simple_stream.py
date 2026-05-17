@@ -1,6 +1,5 @@
 from flask import Flask, Response
 from picamera2 import Picamera2
-import cv2
 import time
 
 app = Flask(__name__)
@@ -13,24 +12,22 @@ time.sleep(2)
 
 def generate_frames():
     while True:
-        frame = picam2.capture_array()
+        # Capture JPEG directly (NO OpenCV)
+        frame = picam2.capture_file("/dev/shm/frame.jpg")
 
-        ret, buffer = cv2.imencode('.jpg', frame)
-        frame = buffer.tobytes()
+        with open("/dev/shm/frame.jpg", "rb") as f:
+            jpg = f.read()
 
         yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-
-        time.sleep(0.01)
+               b'Content-Type: image/jpeg\r\n\r\n' + jpg + b'\r\n')
 
 @app.route('/')
 def index():
-    return "<h1>Raspberry Pi Camera Stream</h1><img src='/video_feed'>"
+    return "<h1>Pi Camera Stream</h1><img src='/video_feed'>"
 
 @app.route('/video_feed')
 def video_feed():
     return Response(generate_frames(),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=False, threaded=True)
+app.run(host="0.0.0.0", port=5000, threaded=True)
