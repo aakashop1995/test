@@ -1,18 +1,18 @@
-import cv2
+from picamera2 import Picamera2
+import time
 
-cap = cv2.VideoCapture(0)
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+picam2 = Picamera2()
 
-# Skip warmup frames
-for i in range(30):
-    cap.read()
+picam2.configure(picam2.create_preview_configuration(main={"size": (320, 240)}))
 
-ret, frame = cap.read()
-print("ret:", ret)
-print("shape:", frame.shape if frame is not None else "None")
-print("mean color (BGR):", frame.mean(axis=(0,1)) if frame is not None else "None")
+picam2.start()
 
-cv2.imwrite('/tmp/test_opencv.jpg', frame)
-print("Saved to /tmp/test_opencv.jpg")
-cap.release()
+time.sleep(2)
+
+print("Camera started successfully")
+
+frame = picam2.capture_array()
+
+print("Frame shape:", frame.shape)
+
+picam2.stop()
