@@ -5,25 +5,29 @@ import time
 app = Flask(__name__)
 
 picam2 = Picamera2()
-picam2.configure(picam2.create_preview_configuration(main={"size": (320, 240)}))
+picam2.configure(picam2.create_video_configuration(main={"size": (320, 240)}))
 picam2.start()
 
 time.sleep(2)
 
 def generate_frames():
     while True:
-        # Capture JPEG directly (NO OpenCV)
-        frame = picam2.capture_file("/dev/shm/frame.jpg")
+        # Get JPEG directly from encoder
+        frame = picam2.capture_array()
 
-        with open("/dev/shm/frame.jpg", "rb") as f:
-            jpg = f.read()
+        import cv2
+        success, buffer = cv2.imencode('.jpg', frame)
+        if not success:
+            continue
+
+        frame = buffer.tobytes()
 
         yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + jpg + b'\r\n')
+               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
 @app.route('/')
 def index():
-    return "<h1>Pi Camera Stream</h1><img src='/video_feed'>"
+    return "<h1>Camera Stream</h1><img src='/video_feed'>"
 
 @app.route('/video_feed')
 def video_feed():
