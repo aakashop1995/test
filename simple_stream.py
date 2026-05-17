@@ -34,4 +34,4 @@ def video_feed():
     return Response(generate_frames(),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
 
-app.run(host="0.0.0.0", port=5000, threaded=True)
+app.run(host="0.0.0.0", port=5000, threaded=True, debug = True)
